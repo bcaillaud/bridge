@@ -119,6 +119,16 @@ if server
                 @@connections[conn_id]=conn
                 $stderr.puts "[#{conn_id}] Connected to #{remote_host}:#{remote_port} #{conn}"
                 res.status=201
+            rescue Errno::EMFILE
+                $stderr.puts "[#{conn_id}] Connection failed: #$!"
+                @@connections.delete_if do |conn_id, conn|
+                    conn.close if not conn.closed?
+                    $stderr.puts "[#{conn_id}] Connection closed for #{conn_id}=#{conn}"
+                    true
+                end
+                res['Content-Type'] = "text/plain"
+                res.body=$!.message
+                res.status=503 # Service Unavailable
             rescue
                 res['Content-Type'] = "text/plain"
                 res.body=$!.message
