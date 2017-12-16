@@ -194,6 +194,7 @@ if server
 else # Client
 
     require "net/http"
+    require 'securerandom'
     require 'uri'
 
     # HACK! https://bugs.ruby-lang.org/issues/12921
@@ -223,12 +224,20 @@ else # Client
     when "STDIN","-"
         _in=$stdin
         _out=$stdout
+    else
+        $stderr.puts "Opening local port #{localPort}"
+        local_server = TCPServer.open("127.0.0.1", localPort.to_i)
+        Thread.abort_on_exception = false
+    end
+
+loop do
+
+    case localPort
+    when "STDIN","-"
         # Keeps this unbuffered
         _in.sync=true
         _out.sync=true
     else
-        $stderr.puts "Opening local port #{localPort}"
-        local_server = TCPServer.open(localPort.to_i)
         $stderr.puts "Waiting for local connection to port #{localPort}"
         local_server_conn = local_server.accept
         _in=_out=local_server_conn
@@ -236,8 +245,11 @@ else # Client
         local_server_conn.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
     end
 
+client_thread=Thread.new(_in,_out) do |_in,_out|
+    $stderr.puts "\nThread started"
+
     #unique Connection IDentifier
-    conn_id=`uuidgen`.chomp
+    conn_id=SecureRandom.uuid
     connected=false
 
 
@@ -263,7 +275,7 @@ else # Client
         end
 
         # Not connected, nothing more to do
-        exit 1 if not connected
+        Thread.current.exit if not connected
 
         # Launch Local write/Remote read loop
         Thread.new do
@@ -319,9 +331,9 @@ else # Client
                 while connected
                     begin
                         # first read from _in ONLY if buf is empty
-                        buf=_in.readpartial(MAXBUF) if !buf
+                        buf=_in.read_nonblock(MAXBUF) if !buf
                     rescue IO::WaitReadable
-                        IO.select([_in])
+                        IO.select([_in],[],[],READ_TIMEOUT+3)
                         retry
                     rescue EOFError
                         $stderr.puts "Local connection closed (lr/rw)"
@@ -356,6 +368,19 @@ else # Client
     rescue Errno::ECONNREFUSED
         $stderr.puts "Connection to bridge failed"
     end
+    Thread.list.each do |thread|
+        $stderr.puts "#{thread.inspect}\n"
+    end
+    $stderr.puts "Thread Finished!"
+end
+    case localPort
+    when "STDIN","-"
+        client_thread.join
+        break
+    else
+        client_thread.wakeup
+    end
+end
 end
 
 $stderr.puts "Program Finished!"
