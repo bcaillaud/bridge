@@ -375,10 +375,10 @@ client_thread=Thread.new(_in,_out) do |_in,_out|
 end
     case localPort
     when "STDIN","-"
-        client_thread.join
+        client_thread.join if client_thread.alive?
         break
     else
-        client_thread.wakeup
+        client_thread.wakeup if client_thread.alive?
     end
 end
 end
