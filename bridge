@@ -368,10 +368,9 @@ client_thread=Thread.new(_in,_out) do |_in,_out|
     rescue Errno::ECONNREFUSED
         $stderr.puts "Connection to bridge failed"
     end
-    Thread.list.each do |thread|
-        $stderr.puts "#{thread.inspect}\n"
-    end
     $stderr.puts "Thread Finished!"
+    thread_count=Thread.list.length-2
+    $stderr.puts " #{thread_count} thread"+(thread_count!=1?"s":"") + " running "
 end
     case localPort
     when "STDIN","-"
