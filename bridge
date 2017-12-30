@@ -193,8 +193,6 @@ if server
 
 else # Client
 
-Thread.new do
-
     require "net/http"
     require 'securerandom'
     require 'uri'
@@ -371,7 +369,7 @@ client_thread=Thread.new(_in,_out) do |_in,_out| begin
         $stderr.puts "Connection to bridge failed"
     end
     $stderr.puts "Thread Finished!"
-    thread_count=Thread.list.length-3
+    thread_count=Thread.list.length-2
     $stderr.puts " #{thread_count} thread"+(thread_count!=1?"s":"") + " running "
     ensure _in.close if not _in.closed? ; _out.close if not _out.closed? ; end
 end
@@ -383,7 +381,6 @@ end
         client_thread.wakeup if client_thread.alive?
     end
 end
-end.join
 end
 
 $stderr.puts "Program Finished!"
