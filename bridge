@@ -245,11 +245,12 @@ loop do
         local_server_conn.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
     end
 
-client_thread=Thread.new(_in,_out) do |_in,_out| begin
-    $stderr.puts "\nThread started"
-
     #unique Connection IDentifier
     conn_id=SecureRandom.uuid
+
+client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
+    $stderr.puts "\nThread started"
+
     connected=false
 
 
