@@ -261,11 +261,13 @@ worker_thread=Thread.new(_in,_out) do |_in,_out| begin
 
     # Open the connection
     begin
-        monitor.synchronize { mutex.synchronize { begin
+        begin
             $stderr.puts "Opening connection over HTTP bridge for #{remote_host}:#{remote_port} (#{conn_id})"
+            monitor.synchronize { mutex.lock }
             # HACK! new().start() because of https://bugs.ruby-lang.org/issues/13351
             Net::HTTP.new(url.host, url.port).start do |http|
                 error=nil
+                mutex.unlock
                 res = http.post("#{url.path}/#{conn_id}","#{remote_host}:#{remote_port}")
                 if res.kind_of? Net::HTTPCreated
                     connected=true
@@ -278,7 +280,7 @@ worker_thread=Thread.new(_in,_out) do |_in,_out| begin
         rescue Errno::EPIPE
             $stderr.puts "Connection to bridge #{url} closed"
             retry
-        end } }
+        end
 
         # Not connected, nothing more to do
         Thread.current.exit if not connected
@@ -287,7 +289,9 @@ worker_thread=Thread.new(_in,_out) do |_in,_out| begin
         Thread.new do
             $stderr.puts "Local write/Remote read loop started"
             begin
+                monitor.synchronize { mutex.lock }
                 Net::HTTP.new(url.host, url.port).start do |http|
+                    mutex.unlock
                     http.read_timeout=READ_TIMEOUT+3
                     while connected
                         res = http.get("#{url.path}/#{conn_id}") {|res| _out.print res }
@@ -333,7 +337,9 @@ worker_thread=Thread.new(_in,_out) do |_in,_out| begin
         # Keep buffer between retries
         buf=nil
         begin
+            monitor.synchronize { mutex.lock }
             Net::HTTP.new(url.host, url.port).start do |http|
+                mutex.unlock
                 while connected
                     begin
                         # first read from _in ONLY if buf is empty
