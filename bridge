@@ -322,9 +322,9 @@ client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
             rescue Net::HTTPServerError
                 raise res.message
             ensure
-                _in.close if not _in.closed?
                 lwrr.pop true
                 $stderr.puts " #{lwrr.size} (lw/rr) #{lrrw.size} (lr/rw) threads "
+                _in.close if not _in.closed?
             end
         end
 
@@ -381,9 +381,9 @@ client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
     end
     $stderr.puts "Thread Finished!"
     ensure
-        _in.close if not _in.closed?
         lrrw.pop true
         $stderr.puts " #{lwrr.size} (lw/rr) #{lrrw.size} (lr/rw) threads "
+        _in.close if not _in.closed?
     end
 end
     case localPort
