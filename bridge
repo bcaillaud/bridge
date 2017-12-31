@@ -230,6 +230,9 @@ else # Client
         Thread.abort_on_exception = false
     end
 
+    lwrr=Queue.new
+    lrrw=Queue.new
+
 loop do
 
     case localPort
@@ -246,6 +249,7 @@ loop do
     end
 
 client_thread=Thread.new(_in,_out) do |_in,_out| begin
+    lrrw.push true
     $stderr.puts "\nThread started"
 
     #unique Connection IDentifier
@@ -279,8 +283,9 @@ client_thread=Thread.new(_in,_out) do |_in,_out| begin
 
         # Launch Local write/Remote read loop
         Thread.new do
-            $stderr.puts "Local write/Remote read loop started"
             begin
+                lwrr.push true
+                $stderr.puts "Local write/Remote read loop started"
                 Net::HTTP.new(url.host, url.port).start do |http|
                     http.read_timeout=READ_TIMEOUT+3
                     while connected
@@ -316,6 +321,8 @@ client_thread=Thread.new(_in,_out) do |_in,_out| begin
                 raise res.message
             ensure
                 _in.close if not _in.closed?
+                lwrr.pop true
+                $stderr.puts " #{lwrr.size} (lw/rr) #{lrrw.size} (lr/rw) threads "
             end
         end
 
@@ -371,9 +378,11 @@ client_thread=Thread.new(_in,_out) do |_in,_out| begin
         $stderr.puts "Connection to bridge failed"
     end
     $stderr.puts "Thread Finished!"
-    thread_count=Thread.list.length-2
-    $stderr.puts " #{thread_count} thread"+(thread_count!=1?"s":"") + " running "
-    ensure _in.close if not _in.closed? ; end
+    ensure
+        _in.close if not _in.closed?
+        lrrw.pop true
+        $stderr.puts " #{lwrr.size} (lw/rr) #{lrrw.size} (lr/rw) threads "
+    end
 end
     case localPort
     when "STDIN","-"
