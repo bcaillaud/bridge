@@ -288,6 +288,7 @@ client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
             begin
                 lwrr.push true
                 $stderr.puts "Local write/Remote read loop started"
+                $stderr.puts " #{lwrr.size} (lw/rr) #{lrrw.size} (lr/rw) threads "
                 Net::HTTP.new(url.host, url.port).start do |http|
                     http.read_timeout=READ_TIMEOUT+3
                     while connected
@@ -335,6 +336,7 @@ client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
 
         # Launch "Local read/Remote write loop started"
         $stderr.puts "Local read/Remote write loop started"
+        $stderr.puts " #{lwrr.size} (lw/rr) #{lrrw.size} (lr/rw) threads "
         # Keep buffer between retries
         buf=nil
         begin
