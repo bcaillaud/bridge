@@ -284,7 +284,7 @@ client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
         Thread.current.exit if not connected
 
         # Launch Local write/Remote read loop
-        Thread.new do
+        Thread.new(_in,_out) do |_in,_out|
             begin
                 lwrr.push true
                 $stderr.puts "Local write/Remote read loop started"
