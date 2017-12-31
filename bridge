@@ -314,13 +314,15 @@ client_thread=Thread.new(_in,_out) do |_in,_out| begin
                 retry if not _in.closed?
             rescue Net::HTTPServerError
                 raise res.message
+            ensure
+                _in.close if not _in.closed?
             end
         end
 
         # If CTRL+C, SIGHUP or SIGTERM, close _in (and itself)
-        trap("INT"){ _in.close }
-        trap("SIGHUP"){ _in.close }
-        trap("SIGTERM"){ _in.close }
+        trap("INT"){ _in.close if not _in.closed? }
+        trap("SIGHUP"){ _in.close if not _in.closed? }
+        trap("SIGTERM"){ _in.close if not _in.closed? }
 
         # Launch "Local read/Remote write loop started"
         $stderr.puts "Local read/Remote write loop started"
@@ -371,7 +373,7 @@ client_thread=Thread.new(_in,_out) do |_in,_out| begin
     $stderr.puts "Thread Finished!"
     thread_count=Thread.list.length-2
     $stderr.puts " #{thread_count} thread"+(thread_count!=1?"s":"") + " running "
-    ensure _in.close if not _in.closed? ; _out.close if not _out.closed? ; end
+    ensure _in.close if not _in.closed? ; end
 end
     case localPort
     when "STDIN","-"
