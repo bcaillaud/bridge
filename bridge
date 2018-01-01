@@ -242,10 +242,21 @@ loop do
         _out.sync=true
     else
         $stderr.puts "Waiting for local connection to port #{localPort}"
-        local_server_conn = local_server.accept
-        _in=_out=local_server_conn
+        local_server_conn = nil
+        loop do
+            begin
+                if IO.select([local_server],[],[],READ_TIMEOUT+3)
+                    local_server_conn = local_server.accept_nonblock
+                    break
+                end
+            rescue
+                $stderr.puts "Still waiting for local connection to port #{localPort}"
+                retry
+            end
+        end
         # Keep connection alive
         local_server_conn.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
+        _in=_out=local_server_conn
     end
 
     #unique Connection IDentifier
