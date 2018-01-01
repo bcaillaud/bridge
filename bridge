@@ -241,7 +241,6 @@ loop do
         _in.sync=true
         _out.sync=true
     else
-        GC.start
         $stderr.puts "Waiting for local connection to port #{localPort}"
         local_server_conn = local_server.accept
         _in=_out=local_server_conn
