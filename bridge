@@ -291,7 +291,8 @@ client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
                 Net::HTTP.new(url.host, url.port).start do |http|
                     http.read_timeout=READ_TIMEOUT+3
                     while connected
-                        res = http.get("#{url.path}/#{conn_id}") {|res| _out.print res }
+                        res = nil
+                        res = http.get("#{url.path}/#{conn_id}") {|res| _out.print res ; res = nil }
                         if res.kind_of? Net::HTTPGone
                             $stderr.puts "Connection closed in remote location (lw/rr)"
                             connected=false
