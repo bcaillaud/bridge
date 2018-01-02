@@ -84,6 +84,7 @@ Thread.abort_on_exception = true
 
 MAXBUF=1024*640 # 640k
 READ_TIMEOUT=60
+CLIENT_MAX_CONNECTIONS=6
 if server
     require 'webrick'
 
@@ -246,8 +247,13 @@ loop do
         loop do
             begin
                 if IO.select([local_server],[],[],READ_TIMEOUT+3)
-                    local_server_conn = local_server.accept_nonblock
-                    break
+                    if lwrr.size < CLIENT_MAX_CONNECTIONS
+                        local_server_conn = local_server.accept_nonblock
+                        break
+                    else
+                        $stderr.puts "Too many local connections (limit #{CLIENT_MAX_CONNECTIONS})"
+                        sleep 1
+                    end
                 end
             rescue
                 $stderr.puts "Still waiting for local connection to port #{localPort}"
