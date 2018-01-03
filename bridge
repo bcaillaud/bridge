@@ -84,7 +84,7 @@ Thread.abort_on_exception = true
 
 MAXBUF=1024*640 # 640k
 READ_TIMEOUT=60
-CLIENT_MAX_CONNECTIONS=64
+CLIENT_MAX_CONNECTIONS=16
 if server
     require 'webrick'
 
