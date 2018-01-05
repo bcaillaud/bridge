@@ -84,7 +84,8 @@ Thread.abort_on_exception = true
 
 MAXBUF=1024*640 # 640k
 READ_TIMEOUT=60
-CLIENT_MAX_CONNECTIONS=16
+CLIENT_MAX_CONNECTIONS=32
+CLIENT_PENDING_CONNECTIONS=6
 if server
     require 'webrick'
 
@@ -227,7 +228,9 @@ else # Client
         _out=$stdout
     else
         $stderr.puts "Opening local port #{localPort}"
-        local_server = TCPServer.open("127.0.0.1", localPort.to_i)
+        local_server = Socket.new(:INET, :STREAM, 0)
+        local_server.bind Addrinfo.tcp("127.0.0.1", localPort.to_i)
+        local_server.listen CLIENT_PENDING_CONNECTIONS
         Thread.abort_on_exception = false
     end
 
@@ -248,7 +251,7 @@ loop do
             begin
                 if IO.select([local_server],[],[],READ_TIMEOUT+3)
                     if lwrr.list.size < CLIENT_MAX_CONNECTIONS and lrrw.list.size < CLIENT_MAX_CONNECTIONS
-                        local_server_conn = local_server.accept_nonblock
+                        local_server_conn, addrinfo = local_server.accept_nonblock
                         break
                     else
                         $stderr.puts "Too many local connections (limit #{CLIENT_MAX_CONNECTIONS})"
@@ -268,13 +271,10 @@ loop do
     #unique Connection IDentifier
     conn_id=SecureRandom.uuid
 
-client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
-    lrrw.add Thread.current
+lrrw.add(client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
     $stderr.puts "\nThread started"
 
     connected=false
-
-
     # Open the connection
     begin
         begin
@@ -300,9 +300,8 @@ client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
         Thread.current.exit if not connected
 
         # Launch Local write/Remote read loop
-        Thread.new(_in,_out) do |_in,_out|
+        lwrr.add(Thread.new(_in,_out) do |_in,_out|
             begin
-                lwrr.add Thread.current
                 $stderr.puts "Local write/Remote read loop started"
                 $stderr.puts " #{lwrr.list.size} (lw/rr) #{lrrw.list.size} (lr/rw) threads "
                 Net::HTTP.new(url.host, url.port).start do |http|
@@ -342,7 +341,7 @@ client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
                 $stderr.puts " #{lwrr.list.size-1} (lw/rr) #{lrrw.list.size} (lr/rw) threads "
                 _in.close if not _in.closed?
             end
-        end
+        end)
 
         # If CTRL+C, SIGHUP or SIGTERM, close _in (and itself)
         trap("INT"){ _in.close if not _in.closed? }
@@ -401,7 +400,7 @@ client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
         $stderr.puts " #{lwrr.list.size} (lw/rr) #{lrrw.list.size-1} (lr/rw) threads "
         _in.close if not _in.closed?
     end
-end
+end)
     case localPort
     when "STDIN","-"
         client_thread.join if client_thread.alive?
