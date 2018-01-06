@@ -277,11 +277,12 @@ loop do
     end
 
     #unique Connection IDentifier
-    conn_id=SecureRandom.uuid
+    conn_id=SecureRandom.uuid.freeze
 
 lrrw.add(client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
     output.push "\nThread started".freeze
 
+    conn_id.freeze
     connected=false
     # Open the connection
     begin
@@ -290,7 +291,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
             # HACK! new().start() because of https://bugs.ruby-lang.org/issues/13351
             Net::HTTP.new(url.host, url.port).start do |http|
                 error=nil
-                res = http.post("#{url.path}/#{conn_id}".freeze,"#{remote_host}:#{remote_port}".freeze)
+                res = http.post("#{url.path}/#{conn_id}".freeze,"#{remote_host}:#{remote_port}".freeze).freeze
                 if res.kind_of? Net::HTTPCreated
                     connected=true
                 else
@@ -315,7 +316,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
                 Net::HTTP.new(url.host, url.port).start do |http|
                     http.read_timeout=READ_TIMEOUT+3
                     while connected
-                        res = http.get("#{url.path}/#{conn_id}".freeze) {|res| _out.print res }
+                        res = (http.get("#{url.path}/#{conn_id}".freeze) {|res| res.freeze ; _out.print res }).freeze
                         if res.kind_of? Net::HTTPGone
                             output.push "Connection closed in remote location (lw/rr)".freeze
                             connected=false
@@ -366,7 +367,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
                 while connected
                     begin
                         # first read from _in ONLY if buf is empty
-                        buf=_in.read_nonblock(MAXBUF) if !buf
+                        buf=_in.read_nonblock(MAXBUF).freeze if !buf
                     rescue IO::WaitReadable
                         IO.select([_in],[],[],READ_TIMEOUT+3)
                         retry
@@ -378,7 +379,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
                         break
                     end
 
-                    res = http.put("#{url.path}/#{conn_id}".freeze,buf)
+                    res = http.put("#{url.path}/#{conn_id}".freeze,buf).freeze
                     if res.kind_of? Net::HTTPGone
                         output.push "Connection closed in remote location (lr/rw)".freeze
                         _in.close if not _in.closed?
