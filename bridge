@@ -211,7 +211,6 @@ else # Client
     end
 
     require "net/http"
-    require 'securerandom'
     require 'uri'
 
     # HACK! https://bugs.ruby-lang.org/issues/12921
@@ -251,6 +250,7 @@ else # Client
 
     lwrr=ThreadGroup.new
     lrrw=ThreadGroup.new
+    random=Random.new
 
 loop do
 
@@ -284,9 +284,12 @@ loop do
     end
 
     #unique Connection IDentifier
-    conn_id=SecureRandom.uuid.freeze
+    uuid=random.bytes(16).unpack("NnnnnN".freeze)
+    uuid[2]=(uuid[2] & 0x0fff) | 0x4000
+    uuid[3]=(uuid[3] & 0x3fff) | 0x8000
+    uuid=("%08x-%04x-%04x-%04x-%04x%08x".freeze % uuid).freeze
 
-lrrw.add(client_thread=Thread.new(_in,_out,conn_id) do |_in,_out,conn_id| begin
+lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
     output.push "\nThread started".freeze
 
     conn_id.freeze
