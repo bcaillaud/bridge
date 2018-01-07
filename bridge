@@ -300,14 +300,12 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
             output.push "Opening connection over HTTP bridge for #{remote_host}:#{remote_port} (#{conn_id})".freeze
             # HACK! new().start() because of https://bugs.ruby-lang.org/issues/13351
             Net::HTTP.new(url.host, url.port).start do |http|
-                error=nil
                 res = http.post("#{url.path}/#{conn_id}".freeze,"#{remote_host}:#{remote_port}".freeze).freeze
                 if res.kind_of? Net::HTTPCreated
                     connected=true
                 else
                     output.push "The bridge failed to connect to the remote location (#{res}): #{res.body}".freeze
                     connected=false
-                    break
                 end
             end
         rescue Errno::EPIPE
