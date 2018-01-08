@@ -295,11 +295,13 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
     conn_id.freeze
     connected=false
     # Open the connection
+    http=nil
     begin
         begin
             output.push "Opening connection over HTTP bridge for #{remote_host}:#{remote_port} (#{conn_id})".freeze
             # HACK! new().start() because of https://bugs.ruby-lang.org/issues/13351
-            Net::HTTP.new(url.host, url.port).start do |http|
+            http=Net::HTTP.new(url.host, url.port).start
+            begin
                 res = http.post("#{url.path}/#{conn_id}".freeze,"#{remote_host}:#{remote_port}".freeze).freeze
                 if res.kind_of? Net::HTTPCreated
                     connected=true
@@ -371,7 +373,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
         # Keep buffer between retries
         buf=nil
         begin
-            Net::HTTP.new(url.host, url.port).start do |http|
+            begin
                 while connected
                     begin
                         # first read from _in ONLY if buf is empty
@@ -411,6 +413,8 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
         end
     rescue Errno::ECONNREFUSED
         output.push "Connection to bridge failed".freeze
+    ensure
+        http.finish
     end
     output.push "Thread Finished!".freeze
     ensure
