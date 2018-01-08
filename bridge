@@ -195,13 +195,6 @@ if server
 
 else # Client
 
-    gc_thread=Thread.new do
-        loop do
-            GC.start
-            sleep 125
-        end
-    end
-
     output=Queue.new
     output_thread=Thread.new do
         loop do
@@ -429,7 +422,6 @@ end)
         client_thread.wakeup if client_thread.alive?
     end
 end
-gc_thread.exit
 output_thread.exit
 end
 
