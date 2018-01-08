@@ -206,7 +206,6 @@ else # Client
     output_thread=Thread.new do
         loop do
             $stderr.puts output.pop
-            sleep 0.03125
         end
     end
 
