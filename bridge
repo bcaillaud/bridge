@@ -318,8 +318,10 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
                 Net::HTTP.new(url.host, url.port).start do |http|
                     http.read_timeout=READ_TIMEOUT+3
                     while connected
-                        res = (http.get("#{url.path}/#{conn_id}".freeze) {|res| res.freeze ; _out.print res }).freeze
-                        if res.kind_of? Net::HTTPGone
+                        res = http.get("#{url.path}/#{conn_id}".freeze).freeze
+                        if res.kind_of? Net::HTTPOK
+                            _out.print res.body
+                        elsif res.kind_of? Net::HTTPGone
                             output.push "Connection closed in remote location (lw/rr)".freeze
                             connected=false
                             _in.close if not _in.closed?
