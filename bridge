@@ -424,6 +424,8 @@ end)
         client_thread.wakeup if client_thread.alive?
     end
 end
+output.push "\n".freeze
+output_thread.run until output.empty?
 output_thread.exit
 end
 
