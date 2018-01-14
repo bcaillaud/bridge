@@ -295,7 +295,6 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
     output_queue "\nThread started".freeze
 
     conn_id.freeze
-    connected=false
     # Open the connection
     http=nil
     begin
@@ -306,11 +305,9 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
             http.keep_alive_timeout=READ_TIMEOUT+3
             begin
                 res = http.post("#{url.path}/#{conn_id}".freeze,"#{remote_host}:#{remote_port}".freeze).freeze
-                if res.kind_of? Net::HTTPCreated
-                    connected=true
-                else
+                if not res.kind_of? Net::HTTPCreated
                     output_queue "The bridge failed to connect to the remote location (#{res}): #{res.body}".freeze
-                    connected=false
+                    _in.close if not _in.closed?
                 end
             end
         rescue Errno::EPIPE
@@ -319,7 +316,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
         end
 
         # Not connected, nothing more to do
-        Thread.current.exit if not connected
+        Thread.current.exit if _in.closed?
 
         # Launch Local write/Remote read loop
         lwrr.add(Thread.new(_in,_out) do |_in,_out|
@@ -328,18 +325,17 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
                 output_queue " #{lwrr.list.size} (lw/rr) #{lrrw.list.size} (lr/rw) threads ".freeze
                 Net::HTTP.new(url.host, url.port).start do |http|
                     http.read_timeout=READ_TIMEOUT+3
-                    while connected
+                    while not _in.closed?
                         res = http.get("#{url.path}/#{conn_id}".freeze).freeze
                         if res.kind_of? Net::HTTPOK
                             _out.print res.body
                         elsif res.kind_of? Net::HTTPGone
                             output_queue "Connection closed in remote location (lw/rr)".freeze
-                            connected=false
                             _in.close if not _in.closed?
                             break
                         elsif res.kind_of? Net::HTTPNotFound
                             output_queue "Connection not opened on bridge".freeze
-                            connected=false
+                            _in.close if not _in.closed?
                             break
                         end
                     end
@@ -379,7 +375,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
         buf=nil
         begin
             begin
-                while connected
+                while not _in.closed?
                     begin
                         # first read from _in ONLY if buf is empty
                         buf=_in.read_nonblock(MAXBUF).freeze if !buf
@@ -389,8 +385,8 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
                     rescue
                         output_queue "Local connection closed (lr/rw)".freeze
                         output_queue "Closing bridge connection to remote location".freeze
+                        _in.close if not _in.closed?
                         http.delete("#{url.path}/#{conn_id}".freeze)
-                        connected=false
                         break
                     end
 
@@ -398,7 +394,6 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
                     if res.kind_of? Net::HTTPGone
                         output_queue "Connection closed in remote location (lr/rw)".freeze
                         _in.close if not _in.closed?
-                        connected=false
                         break
                     end
 
@@ -408,7 +403,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
             end
         rescue Net::ReadTimeout
             output_queue "Net::ReadTimeout (lr/rw)".freeze
-            retry if not _in.closed? and connected
+            retry if not _in.closed?
         rescue Net::HTTPServerError
             raise "Server said: '#{res.message}'".freeze
         rescue Errno::EPIPE, IOError
