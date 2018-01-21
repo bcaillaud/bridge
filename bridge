@@ -417,7 +417,7 @@ mutex.synchronize{lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,
     rescue Errno::ECONNREFUSED
         output_queue "Connection to bridge failed".freeze
     ensure
-        http.finish
+        http.finish if http
     end
     output_queue "Thread Finished!".freeze
     ensure
@@ -427,10 +427,10 @@ mutex.synchronize{lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,
 end)}
     case localPort
     when "STDIN".freeze,"-".freeze
-        client_thread.join if client_thread.alive?
+        client_thread.join if client_thread.alive? if client_thread
         break
     else
-        client_thread.wakeup if client_thread.alive?
+        client_thread.wakeup if client_thread.alive? if client_thread
     end
 end
 output_queue "\n".freeze
