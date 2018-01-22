@@ -358,7 +358,8 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
             rescue Net::HTTPServerError
                 raise res.message
             ensure
-                output_queue " #{lwrr.list.freeze.length-1} (lw/rr) #{lrrw.list.freeze.length} (lr/rw) threads ".freeze
+                ThreadGroup::Default.add Thread.current
+                output_queue " #{lwrr.list.freeze.length} (lw/rr) #{lrrw.list.freeze.length} (lr/rw) threads ".freeze
                 sleep 1
                 _in.close if not _in.closed?
             end
@@ -419,7 +420,8 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
     end
     output_queue "Thread Finished!".freeze
     ensure
-        output_queue " #{lwrr.list.freeze.length} (lw/rr) #{lrrw.list.freeze.length-1} (lr/rw) threads ".freeze
+        ThreadGroup::Default.add Thread.current
+        output_queue " #{lwrr.list.freeze.length} (lw/rr) #{lrrw.list.freeze.length} (lr/rw) threads ".freeze
         sleep 1
         _in.close if not _in.closed?
     end
