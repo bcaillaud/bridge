@@ -305,7 +305,6 @@ mutex.synchronize{lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,
             output_queue "Opening connection over HTTP bridge for #{remote_host}:#{remote_port} (#{conn_id})".freeze
             # HACK! new().start() because of https://bugs.ruby-lang.org/issues/13351
             http=Net::HTTP.new(url.host, url.port).start
-            http.keep_alive_timeout=READ_TIMEOUT+3
             begin
                 res = http.post("#{url.path}/#{conn_id}".freeze,"#{remote_host}:#{remote_port}".freeze).freeze
                 if not res.kind_of? Net::HTTPCreated
