@@ -433,8 +433,6 @@ end)
     when "STDIN".freeze,"-".freeze
         client_thread.join if client_thread.alive? if client_thread
         break
-    else
-        client_thread.wakeup if client_thread.alive? if client_thread
     end
 end
 output_queue "\n".freeze
