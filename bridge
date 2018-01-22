@@ -252,6 +252,7 @@ else # Client
 
     lwrr=ThreadGroup.new
     lrrw=ThreadGroup.new
+    dead=ThreadGroup.new
     random=Random.new
 
 loop do
@@ -267,7 +268,7 @@ loop do
         loop do
             begin
                 if IO.select([local_server],[],[],READ_TIMEOUT+3)
-                    if lwrr.list.freeze.length < CLIENT_MAX_CONNECTIONS and lrrw.list.freeze.length < CLIENT_MAX_CONNECTIONS
+                    if lwrr.list.freeze.length < CLIENT_MAX_CONNECTIONS and lrrw.list.freeze.length < CLIENT_MAX_CONNECTIONS and dead.list.freeze.length < CLIENT_MAX_CONNECTIONS
                         local_server_conn, addrinfo = local_server.accept_nonblock
                         break
                     else
@@ -291,6 +292,8 @@ loop do
     uuid[2]=(uuid[2] & 0x0fff) | 0x4000
     uuid[3]=(uuid[3] & 0x3fff) | 0x8000
     uuid=("%08x-%04x-%04x-%04x-%04x%08x".freeze % uuid).freeze
+
+    client_thread=nil
 
 lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
     output_queue "\nThread started".freeze
@@ -322,7 +325,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
         lwrr.add(Thread.new(_in,_out) do |_in,_out|
             begin
                 output_queue "Local write/Remote read loop started".freeze
-                output_queue " #{lwrr.list.freeze.length} (lw/rr) #{lrrw.list.freeze.length} (lr/rw) threads ".freeze
+                output_queue " #{lwrr.list.freeze.length} (lw/rr) #{lrrw.list.freeze.length} (lr/rw) #{dead.list.freeze.length} (finished) threads ".freeze
                 Net::HTTP.new(url.host, url.port).start do |http|
                     http.read_timeout=READ_TIMEOUT+3
                     while not _in.closed?
@@ -358,8 +361,8 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
             rescue Net::HTTPServerError
                 raise res.message
             ensure
-                ThreadGroup::Default.add Thread.current
-                output_queue " #{lwrr.list.freeze.length} (lw/rr) #{lrrw.list.freeze.length} (lr/rw) threads ".freeze
+                dead.add Thread.current
+                output_queue " #{lwrr.list.freeze.length} (lw/rr) #{lrrw.list.freeze.length} (lr/rw) #{dead.list.freeze.length} (finished) threads ".freeze
                 sleep 1
                 _in.close if not _in.closed?
             end
@@ -372,7 +375,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
 
         # Launch "Local read/Remote write loop started".freeze
         output_queue "Local read/Remote write loop started".freeze
-        output_queue " #{lwrr.list.freeze.length} (lw/rr) #{lrrw.list.freeze.length} (lr/rw) threads ".freeze
+        output_queue " #{lwrr.list.freeze.length} (lw/rr) #{lrrw.list.freeze.length} (lr/rw) #{dead.list.freeze.length} (finished) threads ".freeze
         # Keep buffer between retries
         buf=nil
         begin
@@ -420,8 +423,8 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
     end
     output_queue "Thread Finished!".freeze
     ensure
-        ThreadGroup::Default.add Thread.current
-        output_queue " #{lwrr.list.freeze.length} (lw/rr) #{lrrw.list.freeze.length} (lr/rw) threads ".freeze
+        dead.add Thread.current
+        output_queue " #{lwrr.list.freeze.length} (lw/rr) #{lrrw.list.freeze.length} (lr/rw) #{dead.list.freeze.length} (finished) threads ".freeze
         sleep 1
         _in.close if not _in.closed?
     end
