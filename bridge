@@ -431,7 +431,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
 end)
     case localPort
     when "STDIN".freeze,"-".freeze
-        client_thread.join if client_thread.alive? if client_thread
+        client_thread.join
         break
     end
 end
