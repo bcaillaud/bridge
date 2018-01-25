@@ -157,7 +157,7 @@ if server
             begin
                 res.body = conn.read_nonblock(MAXBUF)
             rescue IO::WaitReadable
-                if IO.select([conn],[],[],READ_TIMEOUT-3)
+                if IO.select([conn],nil,nil,READ_TIMEOUT-3)
                     retry
                 else # Timeout
                     res.body = ''
@@ -268,7 +268,7 @@ loop do
         local_server_conn = nil
         loop do
             begin
-                if IO.select([local_server],[],[],READ_TIMEOUT+3)
+                if IO.select([local_server],nil,nil,READ_TIMEOUT+3)
                     if lwrr.list.freeze.length < CLIENT_MAX_CONNECTIONS and lrrw.list.freeze.length < CLIENT_MAX_CONNECTIONS and flwrr.list.freeze.length < CLIENT_MAX_CONNECTIONS and flrrw.list.freeze.length < CLIENT_MAX_CONNECTIONS
                         local_server_conn, addrinfo = local_server.accept_nonblock
                         break
@@ -386,7 +386,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
                         # first read from _in ONLY if buf is empty
                         buf=_in.read_nonblock(MAXBUF).freeze if !buf
                     rescue IO::WaitReadable, Errno::EINTR
-                        IO.select([_in],[],[],READ_TIMEOUT+3)
+                        IO.select([_in],nil,nil,READ_TIMEOUT+3)
                         retry
                     rescue
                         output_queue "Local connection closed (lr/rw)".freeze
