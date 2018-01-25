@@ -268,9 +268,9 @@ loop do
         local_server_conn = nil
         loop do
             begin
-                if IO.select([local_server],nil,nil,READ_TIMEOUT+3)
+                if IO.select([local_server])
                     if lwrr.list.freeze.length < CLIENT_MAX_CONNECTIONS and lrrw.list.freeze.length < CLIENT_MAX_CONNECTIONS and flwrr.list.freeze.length < CLIENT_MAX_CONNECTIONS and flrrw.list.freeze.length < CLIENT_MAX_CONNECTIONS
-                        local_server_conn, addrinfo = local_server.accept_nonblock
+                        local_server_conn, addrinfo = local_server.accept
                         break
                     else
                         output_queue "Too many local connections (limit #{CLIENT_MAX_CONNECTIONS})".freeze
@@ -384,9 +384,9 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
                 while not _in.closed?
                     begin
                         # first read from _in ONLY if buf is empty
-                        buf=_in.read_nonblock(MAXBUF).freeze if !buf
+                        buf=_in.readpartial(MAXBUF).freeze if IO.select([_in]) if !buf
                     rescue IO::WaitReadable, Errno::EINTR
-                        IO.select([_in],nil,nil,READ_TIMEOUT+3)
+                        IO.select([_in])
                         retry
                     rescue
                         output_queue "Local connection closed (lr/rw)".freeze
