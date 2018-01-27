@@ -374,20 +374,23 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
         output_queue "Local read/Remote write loop started".freeze
         output_queue " #{lwrr.list.freeze.length} (lw/rr) #{lrrw.list.freeze.length} (lr/rw) threads #{flwrr.list.freeze.length} (lw/rr) #{flrrw.list.freeze.length} (lr/rw) finished ".freeze
         # Keep buffer between retries
-        buf=nil
+        buf=String.new
         begin
             begin
                 while not _in.closed?
                     begin
                         # first read from _in ONLY if buf is empty
-                        buf=_in.readpartial(MAXBUF).freeze if IO.select([_in],nil,nil,READ_TIMEOUT+3) if !buf
+                        if buf.empty?
+                            select([_in],nil,nil,READ_TIMEOUT+3)
+                            _in.read_nonblock(MAXBUF,buf)
+                        end
                     rescue IO::WaitReadable, Errno::EINTR
-                        IO.select([_in],nil,nil,READ_TIMEOUT+3)
+                        sleep 1
                         retry
                     rescue
                         output_queue "Local connection closed (lr/rw)".freeze
-                        output_queue "Closing bridge connection to remote location".freeze
                         _in.close if not _in.closed?
+                        output_queue "Closing bridge connection to remote location".freeze
                         http.delete("#{url.path}/#{conn_id}".freeze)
                         break
                     end
@@ -400,7 +403,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
                     end
 
                     # Buffer sent, clear it
-                    buf=nil
+                    buf.clear
                 end
             end
         rescue Net::ReadTimeout
