@@ -267,19 +267,17 @@ loop do
         output_queue "Waiting for local connection to port #{localPort}".freeze
         local_server_conn = nil
         loop do
-            begin
-                if IO.select([local_server])
-                    if lwrr.list.freeze.length < CLIENT_MAX_CONNECTIONS and lrrw.list.freeze.length < CLIENT_MAX_CONNECTIONS and flwrr.list.freeze.length < CLIENT_MAX_CONNECTIONS and flrrw.list.freeze.length < CLIENT_MAX_CONNECTIONS
-                        local_server_conn, addrinfo = local_server.accept
-                        break
-                    else
-                        output_queue "Too many local connections (limit #{CLIENT_MAX_CONNECTIONS})".freeze
-                        sleep 1
-                    end
+            if select([local_server],nil,nil,nil)
+                if lwrr.list.freeze.length < CLIENT_MAX_CONNECTIONS and lrrw.list.freeze.length < CLIENT_MAX_CONNECTIONS and flwrr.list.freeze.length < CLIENT_MAX_CONNECTIONS and flrrw.list.freeze.length < CLIENT_MAX_CONNECTIONS
+                    local_server_conn, addrinfo = local_server.accept
+                    break
+                else
+                    output_queue "Too many local connections (limit #{CLIENT_MAX_CONNECTIONS})".freeze
+                    sleep 1
                 end
-            rescue
+            else
                 output_queue "Still waiting for local connection to port #{localPort}".freeze
-                retry
+                sleep 1
             end
         end
         local_server_conn.setsockopt Socket::Option.linger(true, 10)
