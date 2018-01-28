@@ -252,8 +252,6 @@ else # Client
 
     lwrr=ThreadGroup.new
     lrrw=ThreadGroup.new
-    flwrr=ThreadGroup.new
-    flrrw=ThreadGroup.new
     random=Random.new
 
 loop do
@@ -268,7 +266,7 @@ loop do
         local_server_conn = nil
         loop do
             if select([local_server],nil,nil,nil)
-                if lwrr.list.length < CLIENT_MAX_CONNECTIONS and lrrw.list.length < CLIENT_MAX_CONNECTIONS and flwrr.list.length < CLIENT_MAX_CONNECTIONS and flrrw.list.length < CLIENT_MAX_CONNECTIONS
+                if lwrr.list.length < CLIENT_MAX_CONNECTIONS and lrrw.list.length < CLIENT_MAX_CONNECTIONS
                     local_server_conn, addrinfo = local_server.accept
                     break
                 else
@@ -321,7 +319,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
         lwrr.add(Thread.new(_in,_out) do |_in,_out|
             begin
                 output_queue "Local write/Remote read loop started"
-                output_queue " #{lwrr.list.length} (lw/rr) #{lrrw.list.length} (lr/rw) threads #{flwrr.list.length} (lw/rr) #{flrrw.list.length} (lr/rw) finished "
+                output_queue " #{lwrr.list.length} (lw/rr) #{lrrw.list.length} (lr/rw) threads "
                 Net::HTTP.new(url.host, url.port).start do |http|
                     http.read_timeout=READ_TIMEOUT+3
                     while not _in.closed?
@@ -357,16 +355,14 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
             rescue Net::HTTPServerError
                 raise res.message
             ensure
-                flwrr.add Thread.current
-                output_queue " #{lwrr.list.length} (lw/rr) #{lrrw.list.length} (lr/rw) threads #{flwrr.list.length} (lw/rr) #{flrrw.list.length} (lr/rw) finished "
-                sleep 1
+                output_queue " #{lwrr.list.length-1} (lw/rr) #{lrrw.list.length} (lr/rw) threads "
                 _in.close if not _in.closed?
             end
         end)
 
         # Launch "Local read/Remote write loop started"
         output_queue "Local read/Remote write loop started"
-        output_queue " #{lwrr.list.length} (lw/rr) #{lrrw.list.length} (lr/rw) threads #{flwrr.list.length} (lw/rr) #{flrrw.list.length} (lr/rw) finished "
+        output_queue " #{lwrr.list.length} (lw/rr) #{lrrw.list.length} (lr/rw) threads "
         # Keep buffer between retries
         buf=String.new
         begin
@@ -417,9 +413,7 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
     end
     output_queue "Thread Finished!"
     ensure
-        flrrw.add Thread.current
-        output_queue " #{lwrr.list.length} (lw/rr) #{lrrw.list.length} (lr/rw) threads #{flwrr.list.length} (lw/rr) #{flrrw.list.length} (lr/rw) finished "
-        sleep 1
+        output_queue " #{lwrr.list.length} (lw/rr) #{lrrw.list.length-1} (lr/rw) threads "
         _in.close if not _in.closed?
     end
 end)
