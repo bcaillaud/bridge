@@ -304,7 +304,8 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
                 res = http.post("#{url.path}/#{conn_id}","#{remote_host}:#{remote_port}")
                 if not res.kind_of? Net::HTTPCreated
                     output_queue "The bridge failed to connect to the remote location (#{res}): #{res.body}"
-                    _in.close if not _in.closed?
+                    # Not connected, nothing more to do
+                    Thread.current.exit
                 end
             end
         rescue Errno::EPIPE
@@ -312,51 +313,42 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
             retry
         end
 
-        # Not connected, nothing more to do
-        Thread.current.exit if _in.closed?
-
         # Launch Local write/Remote read loop
-        lwrr.add(Thread.new(_in,_out) do |_in,_out|
+        lwrr.add(paired_thread=Thread.new(Thread.current) do |paired_thread|
             begin
                 output_queue "Local write/Remote read loop started"
                 output_queue " #{lwrr.list.length} (lw/rr) #{lrrw.list.length} (lr/rw) threads "
                 Net::HTTP.new(url.host, url.port).start do |http|
                     http.read_timeout=READ_TIMEOUT+3
-                    while not _in.closed?
+                    while paired_thread.alive?
                         res = http.get("#{url.path}/#{conn_id}")
                         if res.kind_of? Net::HTTPOK
                             _out.print res.body
                         elsif res.kind_of? Net::HTTPGone
                             output_queue "Connection closed in remote location (lw/rr)"
-                            _in.close if not _in.closed?
                             break
                         elsif res.kind_of? Net::HTTPNotFound
                             output_queue "Connection not opened on bridge"
-                            _in.close if not _in.closed?
                             break
                         end
                     end
                 end
-            rescue Errno::EPIPE
-                _in.close if not _in.closed?
             rescue EOFError
                 # retry if local connection is still open
-                retry if not _in.closed?
+                retry if paired_thread.alive?
                 output_queue "Connection to bridge closed (lw/rr)"
             rescue Errno::ECONNREFUSED
                 output_queue "Connection to bridge failed (lw/rr)"
-                _in.close if not _in.closed?
             rescue Timeout::Error
                 output_queue "Timeout (lw/rr)"
-                retry if not _in.closed?
+                retry if paired_thread.alive?
             rescue Net::ReadTimeout
                 output_queue "Net::ReadTimeout (lw/rr)"
-                retry if not _in.closed?
+                retry if paired_thread.alive?
             rescue Net::HTTPServerError
                 raise res.message
             ensure
                 output_queue " #{lwrr.list.length-1} (lw/rr) #{lrrw.list.length} (lr/rw) threads "
-                _in.close if not _in.closed?
             end
         end)
 
@@ -367,19 +359,15 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
         buf=String.new
         begin
             begin
-                while not _in.closed?
+                while paired_thread.alive?
                     begin
                         # first read from _in ONLY if buf is empty
-                        if buf.empty?
-                            select([_in],nil,nil,READ_TIMEOUT+3)
-                            _in.read_nonblock(MAXBUF,buf)
-                        end
+                        _in.read_nonblock(MAXBUF,buf) if buf.empty?
                     rescue IO::WaitReadable, Errno::EINTR
-                        sleep 1
-                        retry
+                        select([_in],nil,nil,3)
+                        retry if paired_thread.alive?
                     rescue
                         output_queue "Local connection closed (lr/rw)"
-                        _in.close if not _in.closed?
                         output_queue "Closing bridge connection to remote location"
                         http.delete("#{url.path}/#{conn_id}")
                         break
@@ -388,7 +376,6 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
                     res = http.put("#{url.path}/#{conn_id}",buf)
                     if res.kind_of? Net::HTTPGone
                         output_queue "Connection closed in remote location (lr/rw)"
-                        _in.close if not _in.closed?
                         break
                     end
 
@@ -398,12 +385,12 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
             end
         rescue Net::ReadTimeout
             output_queue "Net::ReadTimeout (lr/rw)"
-            retry if not _in.closed?
+            retry if paired_thread.alive?
         rescue Net::HTTPServerError
             raise "Server said: '#{res.message}'"
         rescue Errno::EPIPE, IOError
             # retry if local connection is still open
-            retry if not _in.closed?
+            retry if paired_thread.alive?
             output_queue "Connection to bridge closed (lr/rw)"
         end
     rescue Errno::ECONNREFUSED
@@ -414,7 +401,9 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
     output_queue "Thread Finished!"
     ensure
         output_queue " #{lwrr.list.length} (lw/rr) #{lrrw.list.length-1} (lr/rw) threads "
+        # close only here nowhere else to avoid segmentation fault
         _in.close if not _in.closed?
+        # https://bugs.ruby-lang.org/issues/13076
     end
 end)
     case localPort
