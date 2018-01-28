@@ -364,11 +364,6 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
             end
         end)
 
-        # If CTRL+C, SIGHUP or SIGTERM, close _in (and itself)
-        trap("INT"){ _in.close if not _in.closed? }
-        trap("SIGHUP"){ _in.close if not _in.closed? }
-        trap("SIGTERM"){ _in.close if not _in.closed? }
-
         # Launch "Local read/Remote write loop started"
         output_queue "Local read/Remote write loop started"
         output_queue " #{lwrr.list.length} (lw/rr) #{lrrw.list.length} (lr/rw) threads #{flwrr.list.length} (lw/rr) #{flrrw.list.length} (lr/rw) finished "
