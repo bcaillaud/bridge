@@ -371,10 +371,9 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
                     rescue IO::WaitReadable, Errno::EINTR
                         select([_in],nil,nil,3)
                         retry if paired_thread.alive?
+                        break
                     rescue
                         output_queue "Local connection closed (lr/rw)"
-                        output_queue "Closing bridge connection to remote location"
-                        http.delete("#{url.path}/#{conn_id}")
                         break
                     end
 
@@ -401,7 +400,14 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
     rescue Errno::ECONNREFUSED
         output_queue "Connection to bridge failed"
     ensure
-        http.finish if http
+        if http
+            begin
+                output_queue "Closing bridge connection to remote location"
+                http.delete("#{url.path}/#{conn_id}")
+            ensure
+                http.finish
+            end
+        end
     end
     output_queue "Thread Finished!"
     ensure
