@@ -242,6 +242,9 @@ else # Client
     when "STDIN","-"
         _in=$stdin
         _out=$stdout
+        trap("INT","IGNORE")
+        trap("SIGHUP","IGNORE")
+        trap("SIGTERM","IGNORE")
     else
         output_queue "Opening local port #{localPort}"
         local_server = Socket.new(:INET, :STREAM, 0)
@@ -333,6 +336,8 @@ lrrw.add(client_thread=Thread.new(_in,_out,uuid) do |_in,_out,conn_id| begin
                         end
                     end
                 end
+            rescue Errno::EPIPE
+                nil
             rescue EOFError
                 # retry if local connection is still open
                 retry if paired_thread.alive?
