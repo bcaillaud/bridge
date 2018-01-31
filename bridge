@@ -84,6 +84,7 @@ Thread.abort_on_exception = true
 
 MAXBUF=1024*640 # 640k
 READ_TIMEOUT=60
+SERVER_CONNECTION_TIMEOUT=60*60*10 # 10 hours
 CLIENT_MAX_CONNECTIONS=32
 CLIENT_PENDING_CONNECTIONS=6
 if server
@@ -94,19 +95,19 @@ if server
 
         def get_socket(req,res)
             conn_id = req.path.split("/").last
-            conn = @@connections[conn_id]
-            if not conn
-                $stderr.puts "[#{conn_id}] Connection is not open for #{conn_id}=#{conn}"
-                res.status=404
+            if not @@connections.has_key? conn_id
+                $stderr.puts "[#{conn_id}] Connection is not open for #{conn_id}"
+                res.status=404 # Not Found
                 return nil
             end
-            conn
+            @@connections[conn_id][0]=Time.now
+            @@connections[conn_id][1]
         end
 
         def close_socket(req,res)
             conn_id = req.path.split("/").last
-            return if not conn=@@connections[conn_id]
-            conn.close if not conn.closed?
+            return if not @@connections.has_key? conn_id
+            @@connections[conn_id][1].close if not @@connections[conn_id][1].closed?
             @@connections.delete(conn_id)
         end
 
@@ -116,16 +117,20 @@ if server
             remote_port=remote_port.to_i
             $stderr.puts "[#{conn_id}] Opening connection to #{remote_host}:#{remote_port} for #{req.peeraddr}..."
             begin
-                conn=TCPSocket.open(remote_host,remote_port)
-                conn.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
-                @@connections[conn_id]=conn
-                $stderr.puts "[#{conn_id}] Connected to #{remote_host}:#{remote_port} #{conn}"
-                res.status=201
+                if not @@connections.has_key? conn_id
+                    conn=[Time.now,TCPSocket.open(remote_host,remote_port)]
+                    conn[1].setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
+                    @@connections[conn_id]=conn
+                    $stderr.puts "[#{conn_id}] Connected to #{remote_host}:#{remote_port} #{conn[1]}"
+                    res.status=201 # Created
+                else
+                    res.status=409 # Conflict
+                end
             rescue Errno::EMFILE
                 $stderr.puts "[#{conn_id}] Connection failed: #$!"
                 @@connections.delete_if do |conn_id, conn|
-                    conn.close if not conn.closed?
-                    $stderr.puts "[#{conn_id}] Connection closed for #{conn_id}=#{conn}"
+                    conn[1].close if not conn[1].closed?
+                    $stderr.puts "[#{conn_id}] Connection closed for #{conn_id}=#{conn[1]}"
                     true
                 end
                 res['Content-Type'] = "text/plain"
@@ -177,10 +182,20 @@ if server
         end
 
         def do_DELETE(req, res)
+            t=Time.now
+            @@connections.delete_if do |conn_id, conn|
+                if t-conn[0] > SERVER_CONNECTION_TIMEOUT
+                    conn[1].close if not conn[1].closed?
+                    $stderr.puts "[#{conn_id}] Connection timed out for #{conn_id}=#{conn[1]}"
+                    true
+                else
+                    false
+                end
+            end
             conn_id = req.path.split("/").last
             $stderr.puts "[#{conn_id}] Connection closed in client. Trying to close it in remote destination"
             close_socket(req, res)
-            res.status=200
+            res.status=200 # OK
         end
 
     end
