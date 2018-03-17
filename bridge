@@ -113,12 +113,12 @@ if server
 
         def do_POST(req, res)
             conn_id = req.path.split("/").last
-            (remote_host,remote_port)=req.body.split(":")
+            (remote_host,colon,remote_port)=req.body.rpartition(":")
             remote_port=remote_port.to_i
             $stderr.puts "[#{conn_id}] Opening connection to #{remote_host}:#{remote_port} for #{req.peeraddr}..."
             begin
                 if not @@connections.has_key? conn_id
-                    conn=[Time.now,TCPSocket.open(remote_host,remote_port)]
+                    conn=[Time.now,TCPSocket.open(remote_host.delete("[]"),remote_port)]
                     conn[1].setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
                     @@connections[conn_id]=conn
                     $stderr.puts "[#{conn_id}] Connected to #{remote_host}:#{remote_port} #{conn[1]}"
