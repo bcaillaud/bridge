@@ -1,4 +1,5 @@
 #!/usr/bin/ruby
+# coding: utf-8
 # vim: noai:ts=4:sw=4
 #
 #  Copyright (C) 2010-2017 by Luiz Angelo Daros de Luca
@@ -58,6 +59,7 @@ case ARGV.size
         server=false
         url=ARGV[1]
         remote_host=ARGV[2]
+        remote_host=remote_host.gsub(/^bprox\d+_/,'')
         remote_port=ARGV[3].to_i
     else
     $stderr.puts <<-EOF.strip_heredoc
