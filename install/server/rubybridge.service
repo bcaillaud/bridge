@@ -1,0 +1,13 @@
+[Unit]
+Description=Ruby http bridge
+
+[Service]
+SyslogIdentifier=rubybridge
+ExecStart=/usr/local/bin/rubybridge 9090 /bridge
+KillMode=process
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
+
